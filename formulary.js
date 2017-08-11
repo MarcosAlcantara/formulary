@@ -167,7 +167,7 @@ VariableExpressionNode.prototype.toLatex = function()
 
 VariableExpressionNode.prototype.evaluatesConstant = function(variables)
 {
-  return variables[name] == null;
+  return !(this.name in variables);
 };
 
 VariableExpressionNode.prototype.clone = function()
@@ -268,7 +268,7 @@ SequenceExpressionNode.prototype.evaluatesConstant = function(variables)
 
 function AdditionExpressionNode(a, positiveA, b, positiveB) {
   SequenceExpressionNode.call(this, a, positiveA);
-  if ((b != null) && (positiveB != null))
+  if ((typeof(b) != undefined) && (typeof(positiveB) != undefined))
     this.add(b, positiveB);
 }
 
@@ -843,3 +843,154 @@ ExpressionNodeVisitor.prototype.visitPlaceholderExpressionNode = function(node)
 {};
 
 
+function EquationSolver(lhs, rhs, variables)
+{
+  this.lhs = lhs;
+  this.rhs = rhs;
+  this.variables = variables;
+  this.solvable = true;
+  this.solved = false;
+  this.updateSolved();
+}
+
+EquationSolver.prototype.updateSolved = function()
+{
+  if (this.lhs.getType() == Node.VARIABLE_NODE)
+  { 
+    if (this.lhs.getName() in variables)
+      this.solved = true;
+    else
+      this.solvable = false;
+  }
+};
+
+
+EquationSolver.prototype.solveStep = function()
+{
+  this.lhs.visit(this);
+};
+
+EquationSolver.prototype.visitVariableExpressionNode = function(node)
+{
+  this.updateSolved();
+};
+
+EquationSolver.prototype.visitConstantExpressionNode = function(node)
+{
+  this.solvable = false;
+};
+
+EquationSolver.prototype.visitAdditionExpressionNode = function(node)
+{
+  var varNode = null;
+  var constNodes = [];
+  var self = this;
+  node.terms.forEach(function(t) {
+    if (!t.expression.evaluatesConstant(self.variables))
+    {
+      if (varNode==null)
+      {
+        varNode = t;
+      }
+      else
+      {
+        this.solvable = false;
+        return;  
+      }
+    }
+    else
+    {
+      constNodes.push(t);
+    }
+  });
+  
+  if (varNode == null)
+  {
+    this.solvable = false;
+    return;  
+  }
+ 
+  var newRhs = new AdditionExpressionNode(this.rhs, varNode.positive);
+  constNodes.forEach(function(t) {
+    newRhs.add(t.expression, varNode.positive ? !t.positive : t.positive);
+  });
+  
+  this.rhs = newRhs;
+  this.lhs = varNode.expression;
+};
+
+EquationSolver.prototype.visitMultiplicationExpressionNode = function(node)
+{
+  var varNode = null;
+  var constNodes = [];
+  var self = this;
+  node.terms.forEach(function(t) {
+    if (!t.expression.evaluatesConstant(self.variables))
+    {
+      if (varNode==null)
+      {
+        varNode = t;
+      }
+      else
+      {
+        this.solvable = false;
+        return;  
+      }
+    }
+    else
+    {
+      constNodes.push(t);
+    }
+  });
+  
+  if (varNode == null)
+  {
+    this.solvable = false;
+    return;  
+  }
+ 
+  var newRhs = new MultiplicationExpressionNode(this.rhs, varNode.positive);
+  constNodes.forEach(function(t) {
+    newRhs.add(t.expression, varNode.positive ? !t.positive : t.positive);
+  });
+  
+  this.rhs = newRhs;
+  this.lhs = varNode.expression;
+};
+
+EquationSolver.prototype.visitExponentiationExpressionNode = function(node)
+{};
+
+EquationSolver.prototype.visitFunctionExpressionNode = function(node)
+{};
+
+EquationSolver.prototype.visitPlaceholderExpressionNode = function(node)
+{};
+
+function Equation(lhs, rhs)
+{
+  this.lhs = lhs;
+  this.rhs = rhs;
+}
+
+Equation.prototype.solve = function(varname)
+{
+  var vararr = {};
+  variables[varname] = true;
+  var varside, constside;
+  
+  if (this.lhs.evaluatesConstant(variables) && !this.rhs.evaluatesConstant(variables))
+  {
+    constside = this.lhs;
+    varside = this.rhs;
+  }
+  else if (!this.lhs.evaluatesConstant(variables) && this.rhs.evaluatesConstant(variables))
+  {
+    constside = this.rhs;
+    varside = this.lhs;
+  }
+  else
+    return false;
+    
+  
+};
